@@ -16,6 +16,11 @@ export default defineConfig({
       '/generate-3d-model': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        timeout: 600000,
+      },
+      '/models': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
       },
     },
   },

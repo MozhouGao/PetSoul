@@ -295,14 +295,7 @@ interface Pet {
   modelUrl?: string
 }
 
-function CatalogScreen({ onViewPet, onTab }: { onViewPet: (p: Pet) => void; onTab: (t: string) => void }) {
-  const pets: Pet[] = [
-    { id: 1, name: 'Mochi', type: 'cat', mood: 'Happy', level: 5, modelUrl: '/models/pet_0e1d1521_1771566605.glb' },
-    { id: 2, name: 'Biscuit', type: 'dog', mood: 'Playful', level: 8 },
-    { id: 3, name: 'Clover', type: 'bunny', mood: 'Sleepy', level: 3 },
-    { id: 4, name: 'Sunny', type: 'bird', mood: 'Excited', level: 6 },
-  ]
-
+function CatalogScreen({ pets, onViewPet, onTab }: { pets: Pet[]; onViewPet: (p: Pet) => void; onTab: (t: string) => void }) {
   const moodEmoji: Record<string, string> = { Happy: ':)', Playful: ';)', Sleepy: '-_-', Excited: ':D' }
 
   return (
@@ -408,7 +401,7 @@ function PetDetailModal({ pet, onClose }: { pet: Pet | null; onClose: () => void
 }
 
 // ─── Add Pet Screen ───────────────────────────────────────────────
-function AddPetScreen({ onTab }: { onTab: (t: string) => void }) {
+function AddPetScreen({ onTab, onPetCreated }: { onTab: (t: string) => void; onPetCreated: (pet: Pet) => void }) {
   const [step, setStep] = useState(1)
   const [preview, setPreview] = useState<string | null>(null)
   const [petName, setPetName] = useState('')
@@ -467,10 +460,18 @@ function AddPetScreen({ onTab }: { onTab: (t: string) => void }) {
       clearInterval(progressId)
 
       if (response.ok) {
-        // The response is a binary GLB file
-        const blob = await response.blob()
-        const objectUrl = URL.createObjectURL(blob)
-        setGeneratedModelUrl(objectUrl)
+        const data = await response.json()
+        if (data.success && data.model_url) {
+          setGeneratedModelUrl(data.model_url)
+          onPetCreated({
+            id: Date.now(),
+            name: petName,
+            type: data.profile?.species || 'dog',
+            mood: 'Happy',
+            level: 1,
+            modelUrl: data.model_url,
+          })
+        }
         setProgress(100)
         setTimeout(() => setDone(true), 400)
       } else {
@@ -487,7 +488,6 @@ function AddPetScreen({ onTab }: { onTab: (t: string) => void }) {
   }
 
   const reset = () => {
-    if (generatedModelUrl) URL.revokeObjectURL(generatedModelUrl)
     setStep(1); setPreview(null); setPetName(''); setProgress(0); setDone(false)
     setGeneratedModelUrl(null); fileObjRef.current = null
   }
@@ -637,6 +637,10 @@ function AddPetScreen({ onTab }: { onTab: (t: string) => void }) {
 export default function App() {
   const [screen, setScreen] = useState<'auth' | 'catalog' | 'add'>('auth')
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null)
+  const [pets, setPets] = useState<Pet[]>([
+    { id: 1, name: 'Tiger', type: 'cat', mood: 'Happy', level: 5, modelUrl: '/models/pet_0e1d1521_1771566605.glb' },
+    { id: 2, name: 'Buddy', type: 'dog', mood: 'Playful', level: 1, modelUrl: '/models/pet_019ca772_meshy.glb' },
+  ])
 
   const handleTab = (tab: string) => {
     setSelectedPet(null)
@@ -646,16 +650,20 @@ export default function App() {
     else setScreen('catalog')
   }
 
+  const handlePetCreated = (pet: Pet) => {
+    setPets(prev => [...prev, pet])
+  }
+
   return (
     <div className="app-container">
       {screen === 'auth' && <AuthScreen onAuth={() => setScreen('catalog')} />}
       {screen === 'catalog' && (
         <>
-          <CatalogScreen onViewPet={setSelectedPet} onTab={handleTab} />
+          <CatalogScreen pets={pets} onViewPet={setSelectedPet} onTab={handleTab} />
           <PetDetailModal pet={selectedPet} onClose={() => setSelectedPet(null)} />
         </>
       )}
-      {screen === 'add' && <AddPetScreen onTab={handleTab} />}
+      {screen === 'add' && <AddPetScreen onTab={handleTab} onPetCreated={handlePetCreated} />}
     </div>
   )
 }

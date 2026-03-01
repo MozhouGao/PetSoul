@@ -1,32 +1,31 @@
 # ============================================
 # Pet 3D Model Generator - Dependencies
-# Python 3.9, 3.10, or 3.11 recommended
+# Python 3.9–3.13 compatible
 # ============================================
 
 # Core Web Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
 
 # Image Processing
-pillow==10.1.0
-opencv-python==4.8.1.78
+pillow>=10.1.0
+opencv-python>=4.8.1
 
 # Scientific Computing
-numpy>=1.23.0,<1.25.0
-scipy==1.11.4
+numpy>=1.24.0
+scipy>=1.11.4
 
 # Pet Detection (YOLOv8)
-ultralytics==8.0.196
+ultralytics>=8.0.196
 
 # Deep Learning Framework
-torch==2.1.0
-torchvision==0.16.0
+torch>=2.1.0
+torchvision>=0.16.0
 
 # AI Models (CLIP for attribute extraction)
-transformers==4.35.0
-accelerate==0.24.1
-# huggingface_hub - Let pip auto-resolve compatible version
+transformers>=4.35.0
+accelerate>=0.24.1
 safetensors>=0.4.0
 
 # ============================================
@@ -41,8 +40,8 @@ requests>=2.31.0  # HTTP client for Meshy API
 # rembg  # Background removal for better 3D quality (uncomment if needed)
 
 # Utilities
-aiofiles==23.2.1
-python-dotenv==1.0.0
+aiofiles>=23.2.1
+python-dotenv>=1.0.0
 
 # Database + Auth
 SQLAlchemy>=2.0.0

@@ -39,7 +39,7 @@ class Config:
     meshy_topology: str = "triangle"
     meshy_enable_pbr: bool = True
     meshy_poll_interval: float = 5.0
-    meshy_timeout: float = 300.0
+    meshy_timeout: float = 600.0
 
     # Server
     host: str = "0.0.0.0"
