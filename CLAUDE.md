@@ -2,194 +2,187 @@
 
 ## Project Overview
 
-Pet Soul converts pet photographs into textured 3D models (GLB/OBJ). Users upload a photo of a dog or cat, the system detects the pet, classifies breed and physical attributes, then generates a downloadable 3D mesh via the Meshy.ai cloud API.
+Pet Soul is a **Pet Digital Twin Platform** that converts pet photographs and videos into interactive 3D companions with personality and behavior. Users upload photos/videos, the system detects the pet, extracts appearance + motion + audio traits, generates a 3D mesh, and packages everything for a Unity runtime.
 
-**Version**: v0.1 (MVP)
+**Version**: v3.0 (Full Digital Twin)
 **Branch**: `v0.1` (main branch: `main`)
-**Python**: 3.10.14 (compatible with 3.9–3.11)
-**Platform**: Tested on Windows/WSL2
+**Python**: 3.10+ (tested on 3.10.14)
+**Platform**: Tested on Windows/WSL2, Apple M2 compatible
 
 ## Architecture
 
-Three-layer design:
-
-1. **Python Backend** (FastAPI) — detection, extraction, prompt building, API orchestration
-2. **Meshy.ai Cloud** — 3D model generation (no local GPU required)
-3. **iOS App** (Unity, planned/not implemented) — photo capture and 3D viewing
-
-### Pipeline Flow
+Two-branch pipeline:
 
 ```
-Photo → YOLOv8 Detection → CLIP Attribute Extraction → PetProfile → Prompt Builder → Meshy.ai API → GLB File
+Appearance Branch:  Photo → YOLO → CLIP → Meshy API → 3D GLB Model
+Behavior Branch:    Video → MediaPipe → 3D Lift → Motion AE → Personality → FSM
+                    Audio → MFCC → CNN → Vocal/Emotion Classification
+World Model (v3):   Latent State → Dynamics Model → Policy Network → Autonomous Behavior
+
+Both branches → Unity Export Bundle → Interactive AI Pet
 ```
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| `app.py` | FastAPI server, API endpoints, CORS setup |
-| `pipeline.py` | Orchestrator — coordinates all components |
-| `pet_detector.py` | YOLOv8 Nano wrapper for dog/cat detection |
-| `attribute_extractor.py` | CLIP zero-shot classification (breed, coat, markings, body) |
-| `prompt_builder.py` | Converts PetProfile into natural-language texture prompt |
-| `meshy_generator.py` | Meshy.ai REST API client (polling-based async) |
-| `pet_profile.py` | `PetProfile` dataclass — structured attribute container |
-| `config.py` | `Config` frozen dataclass — all thresholds, paths, model names |
-| `quick_test.py` | CLI test script for running pipeline without server |
-| `static/test.html` | Browser-based test UI |
+| `pet_soul/main.py` | Entry point — starts uvicorn server |
+| **API** | |
+| `pet_soul/api/app.py` | FastAPI server, CORS, route registration |
+| `pet_soul/api/routes_auth.py` | Auth0 endpoints (config, me, sync) |
+| `pet_soul/api/routes_pets.py` | Pet CRUD + 3D generation (Supabase) |
+| `pet_soul/api/routes_motion.py` | Video/audio upload + motion analysis |
+| `pet_soul/api/routes_export.py` | Unity export bundle generation |
+| **Appearance** | |
+| `pet_soul/appearance/pipeline.py` | Orchestrator — detection → extraction → 3D |
+| `pet_soul/appearance/pet_detector.py` | YOLOv8 Nano detection |
+| `pet_soul/appearance/attribute_extractor.py` | CLIP zero-shot classification |
+| `pet_soul/appearance/prompt_builder.py` | PetProfile → texture prompt |
+| `pet_soul/appearance/meshy_generator.py` | Meshy.ai API client |
+| `pet_soul/appearance/pet_profile.py` | PetProfile dataclass |
+| **Motion** | |
+| `pet_soul/motion/pose_extractor.py` | MediaPipe 2D keypoint extraction |
+| `pet_soul/motion/lift_2d_to_3d.py` | MLP 2D→3D pose lifting |
+| `pet_soul/motion/motion_autoencoder.py` | LSTM VAE for motion style |
+| `pet_soul/motion/motion_features.py` | Handcrafted motion statistics |
+| **Behavior** | |
+| `pet_soul/behavior/state_machine.py` | FSM (Idle/Curious/Playful/Alert/Resting) |
+| `pet_soul/behavior/personality.py` | PersonalityProfile from motion+audio |
+| **Audio** | |
+| `pet_soul/audio/feature_extractor.py` | MFCC + audio statistics |
+| `pet_soul/audio/audio_classifier.py` | CNN vocal/emotion classifier |
+| **World Model** | |
+| `pet_soul/world_model/latent_dynamics.py` | Latent state transition predictor |
+| `pet_soul/world_model/policy_network.py` | Action selection via imagination |
+| **Runtime Export** | |
+| `pet_soul/runtime_export/unity_exporter.py` | Unity bundle packaging |
+| **Config & DB** | |
+| `pet_soul/config/settings.py` | Config dataclass + PROJECT_ROOT |
+| `pet_soul/db/supabase_client.py` | Supabase client (replaces SQLAlchemy) |
+| `pet_soul/db/auth.py` | Auth0 JWT verification |
 
 ## Directory Structure
 
 ```
-pet_soul/
-├── app.py, pipeline.py, config.py      # Core backend
-├── pet_detector.py                      # YOLOv8 detection
-├── attribute_extractor.py               # CLIP classification
-├── prompt_builder.py                    # Texture prompt generation
-├── meshy_generator.py                   # Meshy.ai API client
-├── pet_profile.py                       # Data model
-├── quick_test.py                        # CLI test
-├── requirements.txt                     # Pinned dependencies
-├── .env                                 # MESHY_API_KEY (not committed)
-├── yolov8n.pt                           # YOLOv8 Nano weights (6.5MB)
-├── loras/pet_cartoon_lora.safetensors   # LoRA weights (future use)
-├── static/                              # Web test UI
-├── models/                              # Generated 3D output files
-├── avatars/                             # Generated avatar output
-├── docs/                                # 10 markdown docs (see below)
-├── PetSoulApp/                          # Unity iOS app (planned)
-├── TripoSR/                             # Deprecated local 3D gen
-└── CLAUDE.md                            # This file
+PetSoul/
+├── pet_soul/                            # Main Python package
+│   ├── __init__.py                      # Version: 3.0.0
+│   ├── main.py                          # Entry point
+│   ├── config/                          # Configuration
+│   │   └── settings.py                  # Config dataclass + PROJECT_ROOT
+│   ├── appearance/                      # ML pipeline (photo → 3D)
+│   │   ├── pipeline.py, pet_detector.py, attribute_extractor.py
+│   │   ├── prompt_builder.py, meshy_generator.py, pet_profile.py
+│   ├── motion/                          # Video → motion (v2.1)
+│   │   ├── pose_extractor.py            # MediaPipe
+│   │   ├── lift_2d_to_3d.py             # MLP lifter
+│   │   ├── motion_autoencoder.py        # LSTM VAE
+│   │   └── motion_features.py           # Motion statistics
+│   ├── behavior/                        # Behavior engine (v2.2)
+│   │   ├── state_machine.py             # FSM
+│   │   └── personality.py               # Personality profile
+│   ├── audio/                           # Audio analysis (v2.2)
+│   │   ├── feature_extractor.py         # MFCC
+│   │   └── audio_classifier.py          # CNN classifier
+│   ├── world_model/                     # World model (v3.0)
+│   │   ├── latent_dynamics.py           # State predictor
+│   │   └── policy_network.py            # Action selection
+│   ├── runtime_export/                  # Unity export
+│   │   └── unity_exporter.py
+│   ├── db/                              # Database layer
+│   │   ├── supabase_client.py           # Supabase client
+│   │   └── auth.py                      # Auth0 JWT verification
+│   └── api/                             # FastAPI endpoints
+│       ├── app.py, routes_auth.py, routes_pets.py
+│       ├── routes_motion.py, routes_export.py
+├── tests/
+│   └── test_quick.py
+├── requirements.txt
+├── .env.example
+├── yolov8n.pt
+├── static/, models/, frontend/, docs/
+└── CLAUDE.md
 ```
 
 ## Tech Stack
 
-- **Web Framework**: FastAPI 0.104.1 + Uvicorn 0.24.0
-- **Detection**: Ultralytics YOLOv8 Nano (`yolov8n.pt`, 6.5MB)
-- **Classification**: OpenAI CLIP ViT-base-32 (`openai/clip-vit-base-patch32`, ~300MB, auto-downloaded)
-- **3D Generation**: Meshy.ai cloud API (model: `meshy-6`, 15k–30k polygons)
-- **Deep Learning**: PyTorch 2.1.0, Transformers 4.35.0, Accelerate 0.24.1
-- **Image Processing**: Pillow 10.1.0, OpenCV 4.8.1
-- **Utilities**: NumPy, SciPy, Requests, aiofiles, python-dotenv
+- **Web Framework**: FastAPI + Uvicorn
+- **Auth**: Auth0 (JWT RS256 verification)
+- **Database**: Supabase (PostgreSQL)
+- **Detection**: YOLOv8 Nano
+- **Classification**: CLIP ViT-base-32
+- **3D Generation**: Meshy.ai cloud API (meshy-6)
+- **Pose Extraction**: MediaPipe
+- **Motion Learning**: PyTorch LSTM VAE
+- **Audio**: librosa MFCC + PyTorch CNN
+- **Deep Learning**: PyTorch, Transformers, Accelerate
+- **Runtime**: Unity (export bundles)
 
 ## API Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/` | Server status + capabilities |
-| `GET` | `/health` | Component readiness check |
-| `GET` | `/test` | Redirects to web test UI |
-| `POST` | `/analyze-pet` | Detection + attribute extraction → JSON profile |
-| `POST` | `/generate-3d-model` | Full pipeline → binary 3D file (profile in headers) |
-| `POST` | `/generate-avatar` | Legacy alias for `/generate-3d-model` |
-| `GET` | `/models/<file>.glb` | Serve generated 3D model files |
-
-## Data Model — PetProfile
-
-```python
-@dataclass
-class PetProfile:
-    species: str              # "dog" or "cat"
-    breed: Optional[str]
-    breed_confidence: float
-    coat_colors: List[str]    # up to 3, threshold 0.05
-    markings: List[str]       # threshold 0.15
-    fur_length: Optional[str]
-    body_type: Optional[str]  # compact, athletic, stocky, slender, large
-    ear_shape: Optional[str]  # floppy, erect, semi_erect, rose, button
-    tail_type: Optional[str]  # long_curved, long_straight, curled, short, docked
-    snout_length: Optional[str]  # flat, short, medium, long
-    size_class: Optional[str]    # toy, small, medium, large, giant
-    leg_length: Optional[str]    # short, medium, long
-```
-
-## Configuration (config.py)
-
-All settings live in a frozen `Config` dataclass. Key values:
-
-- `yolo_conf_threshold`: 0.25
-- `coat_color_threshold`: 0.05, `marking_threshold`: 0.15, `max_coat_colors`: 3
-- `clip_model_name`: `openai/clip-vit-base-patch32`
-- `meshy_ai_model`: `meshy-6`, `meshy_target_polycount`: 15000
-- `meshy_poll_interval`: 5.0s, `meshy_timeout`: 300.0s
-- `default_output_format`: `glb`
-- Server: `0.0.0.0:8000`
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/` | No | Server status |
+| `GET` | `/health` | No | Component readiness |
+| `GET` | `/test` | No | Web test UI redirect |
+| `POST` | `/generate-3d-model` | No | Quick 3D generation |
+| `GET` | `/auth/config` | No | Auth0 config for frontend |
+| `GET` | `/auth/me` | Yes | Current user from token |
+| `POST` | `/auth/sync` | Yes | Sync Auth0 user to Supabase |
+| `GET` | `/pets` | Yes | List user's pets |
+| `POST` | `/pets` | Yes | Create pet + generate 3D |
+| `GET` | `/pets/{id}` | Yes | Get pet details |
+| `DELETE` | `/pets/{id}` | Yes | Delete pet |
+| `POST` | `/motion/analyze-video` | Yes | Extract motion + personality |
+| `POST` | `/motion/analyze-audio` | Yes | Classify pet vocalisations |
+| `GET` | `/motion/personality/{pet_id}` | Yes | Get personality profile |
+| `POST` | `/export/{pet_id}/unity` | Yes | Download Unity export ZIP |
 
 ## Environment Setup
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Linux/WSL
-# .venv\Scripts\activate         # Windows
+source .venv/bin/activate
 pip install -r requirements.txt
-echo "MESHY_API_KEY=your_key" > .env
-python app.py                    # Runs on http://localhost:8000
+cp .env.example .env   # Then fill in your keys
+python -m pet_soul.main
 ```
 
-- Requires **Meshy.ai Pro** account (~$20/month for ~50 models)
-- `MESHY_API_KEY` must be set in `.env`
-- Minimum 4GB RAM (CLIP + YOLOv8 use ~1–2GB)
-- No GPU required — CPU inference works; Meshy handles 3D in cloud
+Required environment variables (see `.env.example`):
+- `MESHY_API_KEY` — Meshy.ai Pro account
+- `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLIENT_ID` — Auth0 tenant
+- `SUPABASE_URL`, `SUPABASE_KEY` — Supabase project
 
 ## Development Commands
 
 ```bash
 # Run the server
-python app.py
+python -m pet_soul.main
 
-# Quick CLI test (no server needed)
-python quick_test.py
+# Quick CLI test (requires server running)
+python tests/test_quick.py <image_path>
 
 # Test via curl
-curl -X POST http://localhost:8000/analyze-pet -F "file=@photo.jpg"
-curl -X POST http://localhost:8000/generate-3d-model -F "file=@photo.jpg" --output model.glb
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/generate-3d-model -F "file=@photo.jpg"
 ```
-
-## Current Status & Known Gaps
-
-### Working
-- Dog detection and classification (25 breeds)
-- Coat color (15 options), markings (9 options), physical trait extraction
-- 3D model generation via Meshy.ai
-- Web test UI at `/test`
-
-### Not Implemented
-- Cat breed classification (detection works, breeds not classified)
-- LoRA-based avatar generation (weights present but not wired in)
-- Unity iOS app (plan documented in `docs/MOBILE_APP_PLAN.md`)
-- TripoSR local generation (deprecated, replaced by Meshy.ai)
-
-## Documentation Index (docs/)
-
-| File | Content |
-|---|---|
-| `AI_PROJECT_SUMMARY.md` | Best single-file overview for LLMs |
-| `FULL_ARCHITECTURE.md` | System architecture with network diagrams |
-| `tech_stack.md` | Detailed technology breakdown |
-| `architecture.md` | Component responsibilities and data flow |
-| `api_reference.md` | Full API docs with request/response examples |
-| `project_structure.md` | Directory tree and file descriptions |
-| `development_guide.md` | Setup, testing, troubleshooting |
-| `skills_required.md` | Required technical knowledge |
-| `additional_notes.md` | Gaps, costs, optional dependencies |
-| `MOBILE_APP_PLAN.md` | iOS app implementation plan (Unity) |
 
 ## Coding Conventions
 
-- Python dataclasses for data models (not Pydantic)
+- Python dataclasses for data models (not Pydantic, except API request/response schemas)
 - Frozen dataclass for configuration (`Config`)
 - Standard library `logging` (no third-party logger)
 - Type hints used throughout
-- Async not used in pipeline (sync requests to Meshy.ai with polling)
-- FastAPI handles async at the endpoint level
 - All file paths use `pathlib.Path`
-- Imports are absolute (no relative imports)
+- Imports are absolute package imports (e.g., `from pet_soul.config import CONFIG`)
+- Auth via Auth0 JWT verification (no passwords stored server-side)
+- Data via Supabase client (no local ORM)
 
 ## Important Notes
 
-- `.env` contains `MESHY_API_KEY` — never commit this file
+- `.env` contains API keys — never commit this file
 - `yolov8n.pt` is committed to the repo (6.5MB)
 - CLIP model auto-downloads on first run (~300MB to HuggingFace cache)
 - 3D generation takes 1–3 minutes per model via Meshy.ai
-- Output files are 15–30MB GLB files stored in `models/`
-- `install.bat` provided for Windows setup
+- Motion/audio models require training on pet-specific data before production use
+- World model (v3.0) modules are architecturally complete but require training

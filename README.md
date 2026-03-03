@@ -1,6 +1,6 @@
-# Pet 3D Model Generator — Backend
+# PetSoul — Pet Digital Twin Platform
 
-End-to-end system that takes a pet photo, extracts visual attributes (breed, coat color, markings), and generates a 3D model using TripoSR.
+End-to-end system that transforms pet photos and videos into living digital twins: 3D models with personality, motion, and behavior powered by AI.
 
 ## Table of Contents
 
@@ -8,73 +8,119 @@ End-to-end system that takes a pet photo, extracts visual attributes (breed, coa
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [API Reference](#api-reference)
-- [Inference Pipeline](#inference-pipeline)
+- [Modules](#modules)
+- [Configuration](#configuration)
 - [Testing](#testing)
-- [Dependency Troubleshooting](#dependency-troubleshooting)
+- [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 
 ---
 
 ## Architecture
 
-### Components
+### Pipeline
 
-**Backend API** — FastAPI server handling image preprocessing, pet detection/cropping, attribute inference, and 3D model generation.
-
-**ML Models:**
-- **YOLOv8** — Pet detection and bounding box
-- **CLIP** — Breed classification, color extraction, marking detection
-- **TripoSR** — Image-to-3D model generation
+```
+Photo → YOLOv8 Detection → CLIP Attributes → PetProfile → Meshy.ai → GLB Model
+Video → MediaPipe Pose → 3D Lifting → Motion VAE → Personality Profile
+Audio → MFCC Features → CNN Classifier → Vocal Type + Emotion
+All → Latent State → World Model → Behavior FSM → Unity Export
+```
 
 ```mermaid
 graph LR
-    UI[Client] --> API[FastAPI Backend]
-    API --> YOLO[YOLOv8 Detector]
-    API --> CLIP[CLIP Extractor]
-    API --> TRIPOSR[TripoSR 3D Generator]
-    TRIPOSR --> MESH[3D Mesh Output]
-    MESH --> API
-    API --> UI
+    Photo[Pet Photo] --> YOLO[YOLOv8 Detector]
+    YOLO --> CLIP[CLIP Extractor]
+    CLIP --> Profile[PetProfile]
+    Profile --> Meshy[Meshy.ai API]
+    Meshy --> GLB[3D Model]
+
+    Video[Pet Video] --> MP[MediaPipe]
+    MP --> Lift[3D Lifter]
+    Lift --> VAE[Motion VAE]
+    VAE --> Personality[Personality]
+
+    Audio[Pet Audio] --> MFCC[MFCC]
+    MFCC --> CNN[Audio CNN]
+
+    Personality --> FSM[Behavior FSM]
+    CNN --> FSM
+    FSM --> World[World Model]
+    World --> Export[Unity Bundle]
+    GLB --> Export
 ```
-
-### Data Flow
-
-1. **Image Upload** → Client sends pet photo
-2. **Pet Detection** → YOLOv8 detects and crops pet
-3. **Attribute Extraction** → CLIP extracts breed, colors, markings
-4. **3D Generation** → TripoSR generates 3D mesh from cropped image
-5. **Model Export** → Mesh saved as GLB/OBJ/PLY/STL
-6. **Response** → 3D model file returned to client
 
 ### Project Structure
 
 ```
-backend/
-├── app.py                  # FastAPI application with API endpoints
-├── pipeline.py             # Main processing pipeline
-├── model3d_generator.py    # TripoSR-based 3D model generation
-├── pet_detector.py         # YOLOv8 pet detection
-├── attribute_extractor.py  # CLIP-based attribute extraction
-├── pet_profile.py          # Pet profile data model
-├── prompt_builder.py       # Metadata prompt builder
-├── requirements.txt        # Python dependencies
-├── quick_test.py           # Automated testing script
-├── models/                 # Generated 3D model output
-├── static/test.html        # Web test interface
-└── loras/                  # LoRA files (optional)
-```
-
-### Pet Profile Data Contract
-
-```json
-{
-  "species": "dog",
-  "breed": "Siberian Husky",
-  "breed_confidence": 0.89,
-  "coat_colors": ["black", "white"],
-  "markings": ["facial mask"],
-  "fur_length": "medium"
-}
+PetSoul/
+├── pet_soul/                      # Python package
+│   ├── main.py                    # Entry point
+│   ├── config/settings.py         # All configuration
+│   ├── appearance/                # Photo → 3D model pipeline
+│   │   ├── pipeline.py            # Orchestrator
+│   │   ├── pet_detector.py        # YOLOv8 detection
+│   │   ├── attribute_extractor.py # CLIP classification
+│   │   ├── prompt_builder.py      # Texture prompt generation
+│   │   ├── meshy_generator.py     # Meshy.ai API client
+│   │   └── pet_profile.py         # PetProfile dataclass
+│   ├── motion/                    # Video → motion analysis
+│   │   ├── pose_extractor.py      # MediaPipe keypoints
+│   │   ├── lift_2d_to_3d.py       # MLP depth prediction
+│   │   ├── motion_autoencoder.py  # LSTM VAE
+│   │   └── motion_features.py     # Handcrafted motion stats
+│   ├── behavior/                  # Personality + state machine
+│   │   ├── personality.py         # PersonalityProfile
+│   │   └── state_machine.py       # Probabilistic FSM
+│   ├── audio/                     # Audio classification
+│   │   ├── feature_extractor.py   # MFCC extraction
+│   │   └── audio_classifier.py    # 1D CNN classifier
+│   ├── world_model/               # Predictive behavior
+│   │   ├── latent_dynamics.py     # z(t+1) = f(z(t), action)
+│   │   └── policy_network.py      # Reward + action selection
+│   ├── runtime_export/            # Unity packaging
+│   │   └── unity_exporter.py      # Bundle + ZIP export
+│   ├── db/                        # Database + auth
+│   │   ├── auth.py                # Auth0 JWT verification
+│   │   └── supabase_client.py     # Supabase client
+│   └── api/                       # FastAPI routes
+│       ├── app.py                 # App + middleware
+│       ├── routes_auth.py         # /auth/* endpoints
+│       ├── routes_pets.py         # /pets/* endpoints
+│       ├── routes_motion.py       # /motion/* endpoints
+│       └── routes_export.py       # /export/* endpoints
+├── frontend/                      # React frontend (Auth0 + Three.js)
+│   ├── src/
+│   │   ├── main.tsx               # Entry point (Auth0Provider)
+│   │   ├── App.tsx                # All screens + Auth0 integration
+│   │   ├── api.ts                 # Authenticated API wrapper
+│   │   ├── App.css                # Minecraft theme styles
+│   │   └── index.css              # Global styles + CSS variables
+│   ├── vite.config.ts             # Vite + backend proxy
+│   ├── .env.local                 # Auth0 env vars (gitignored)
+│   └── package.json
+├── dash_app/                      # Developer testing dashboard
+│   ├── app.py                     # Dash app (port 8050)
+│   ├── requirements.txt
+│   └── tabs/                      # 12 model testing tabs
+│       ├── tab_detector.py        # YOLOv8 detection test
+│       ├── tab_attributes.py      # CLIP attribute test
+│       ├── tab_pipeline.py        # Full pipeline test
+│       ├── tab_pose.py            # MediaPipe pose test
+│       ├── tab_motion_features.py # Motion stats radar chart
+│       ├── tab_autoencoder.py     # LSTM VAE latent space
+│       ├── tab_audio_classifier.py# Audio CNN test
+│       ├── tab_audio_features.py  # Waveform + MFCC
+│       ├── tab_fsm.py             # Interactive FSM
+│       ├── tab_personality.py     # Personality radar chart
+│       ├── tab_dynamics.py        # Latent dynamics rollout
+│       └── tab_policy.py          # Policy action selection
+├── tests/
+├── static/                        # Web test UI
+├── models/                        # Generated 3D output
+├── requirements.txt
+├── .env.example
+└── CLAUDE.md
 ```
 
 ---
@@ -83,50 +129,78 @@ backend/
 
 ### Prerequisites
 
-- **Python 3.9, 3.10, or 3.11** (3.10 recommended)
-- ~5 GB disk space (packages + models)
-- GPU optional but recommended
+- **Python 3.10+** (tested on 3.10.14)
+- **Meshy.ai Pro** account (~$20/month) for 3D model generation
+- **Auth0** account (free tier works) for authentication
+- **Supabase** project (free tier works) for database
+- ~4 GB RAM minimum (CLIP + YOLOv8)
+- No GPU required — all 3D generation happens in Meshy.ai cloud
 
-### Step 1: Create Virtual Environment
-
-```bash
-cd pet_soul/backend
-
-python -m venv venv
-venv\Scripts\activate      # Windows
-# source venv/bin/activate # Mac/Linux
-
-python -m pip install --upgrade pip
-```
-
-### Step 2: Install Dependencies
+### Setup
 
 ```bash
+# Clone and enter project
+cd PetSoul
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate        # Linux/WSL/Mac
+# .venv\Scripts\activate         # Windows
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your credentials:
+#   MESHY_API_KEY    — from Meshy.ai dashboard
+#   AUTH0_DOMAIN     — from Auth0 > Applications > Settings
+#   AUTH0_AUDIENCE   — your Auth0 API identifier
+#   AUTH0_CLIENT_ID  — from Auth0 > Applications > Settings
+#   SUPABASE_URL     — from Supabase > Settings > API
+#   SUPABASE_KEY     — Supabase anon or service role key
 ```
 
-### Step 3: Install TripoSR (from GitHub)
+### Supabase Database Setup
 
-TripoSR is not on PyPI — install separately:
+Create these tables in your Supabase SQL editor:
 
-```bash
-pip install git+https://github.com/VAST-AI-Research/TripoSR.git
-```
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    auth0_id TEXT UNIQUE NOT NULL,
+    email TEXT,
+    name TEXT,
+    picture TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-### Step 4: Verify Installation
+CREATE TABLE pets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    species TEXT,
+    breed TEXT,
+    profile JSONB,
+    model_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-```bash
-python -c "import torch; import transformers; import trimesh; print('All imports OK')"
-python -c "from tsr.system import TSR; print('TripoSR OK')"
-```
+CREATE TABLE motion_data (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pet_id UUID REFERENCES pets(id),
+    motion_stats JSONB,
+    latent_vector BYTEA,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-### GPU Support (Optional)
-
-For NVIDIA GPU acceleration:
-
-```bash
-pip uninstall torch torchvision
-pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+CREATE TABLE personality_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pet_id UUID REFERENCES pets(id),
+    profile JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ---
@@ -134,114 +208,148 @@ pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 --index-url https://dow
 ## Quick Start
 
 ```bash
-# Start the server
-python app.py
+# 1. Start the backend API (port 8000)
+python -m pet_soul.main
 
-# Server starts at http://0.0.0.0:8000
+# 2. Start the React frontend (port 5173)
+cd frontend
+npm install
+npm run dev
+
+# 3. (Optional) Start the Dash dev dashboard (port 8050)
+pip install -r dash_app/requirements.txt
+python -m dash_app.app
 ```
 
-First run will download models automatically (~1.5 GB for TripoSR, ~300 MB for CLIP, ~6 MB for YOLOv8).
+First run will auto-download CLIP (~300 MB) and YOLOv8 Nano (~6.5 MB).
 
-### Test with Web Interface
+### Frontend
 
-Open http://localhost:8000/test in your browser.
+Open http://localhost:5173 — the React app with Auth0 login, pet collection, 3D model viewer, and video/audio upload.
+
+The frontend requires Auth0 credentials in `frontend/.env.local`:
+```
+VITE_AUTH0_DOMAIN=your-tenant.auth0.com
+VITE_AUTH0_CLIENT_ID=your_client_id
+VITE_AUTH0_AUDIENCE=https://petsoul-api
+```
+
+Auth0 Application settings must list `http://localhost:5173` as an Allowed Callback URL, Allowed Logout URL, and Allowed Web Origin.
+
+### Dev Dashboard
+
+Open http://localhost:8050 — the Dash testing app with 12 tabs for testing each ML model individually (detector, attributes, pipeline, pose, motion, autoencoder, audio, FSM, personality, dynamics, policy).
 
 ### Test with curl
 
 ```bash
-# Analyze a pet photo
-curl -X POST http://localhost:8000/analyze-pet -F "file=@pet_photo.jpg"
+# Health check
+curl http://localhost:8000/health
 
-# Generate a 3D model
-curl -X POST "http://localhost:8000/generate-3d-model?format=glb&resolution=128" \
-  -F "file=@pet_photo.jpg" -o pet_model.glb
-```
+# Generate 3D model from photo (no auth required)
+curl -X POST http://localhost:8000/generate-3d-model \
+  -F "file=@pet_photo.jpg"
 
-### Test with Script
+# Create a pet (auth required)
+curl -X POST http://localhost:8000/pets/ \
+  -H "Authorization: Bearer YOUR_AUTH0_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Buddy", "species": "dog"}'
 
-```bash
-python quick_test.py path/to/pet_photo.jpg
+# Analyze motion from video (auth required)
+curl -X POST http://localhost:8000/motion/analyze-video \
+  -H "Authorization: Bearer YOUR_AUTH0_TOKEN" \
+  -F "file=@pet_video.mp4" \
+  -F "pet_id=PET_UUID"
+
+# Export Unity bundle (auth required)
+curl -X POST http://localhost:8000/export/PET_UUID/unity \
+  -H "Authorization: Bearer YOUR_AUTH0_TOKEN" \
+  --output pet_bundle.zip
 ```
 
 ---
 
 ## API Reference
 
-### `POST /generate-3d-model`
+### Public Endpoints
 
-Generate a 3D model from a pet photo.
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Server status |
+| `GET` | `/health` | Component readiness check |
+| `GET` | `/test` | Web test UI redirect |
+| `POST` | `/generate-3d-model` | Photo → 3D model (no auth) |
+| `GET` | `/auth/config` | Auth0 config for frontend SDK |
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `file` | multipart | required | Pet photo |
-| `format` | query | `glb` | Output format: `glb`, `obj`, `ply`, `stl` |
-| `resolution` | query | `256` | Marching cubes resolution: 128–512 |
+### Authenticated Endpoints
 
-**Returns:** 3D model file
+All require `Authorization: Bearer <Auth0_JWT>` header.
 
-### `POST /analyze-pet`
-
-Detect pet and extract attributes (no 3D generation).
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `file` | multipart | Pet photo |
-
-**Returns:** JSON with pet profile (breed, colors, markings)
-
-### `GET /health`
-
-**Returns:** JSON system status (`pipeline_ready`, `detector_ready`, `generator_ready`)
-
-### `GET /test`
-
-Web test interface.
-
-### Supported 3D Formats
-
-| Format | Best For |
-|--------|----------|
-| **GLB** | Web/mobile (compact, includes textures) — recommended |
-| **OBJ** | Widely compatible, simple text format |
-| **PLY** | Colored meshes |
-| **STL** | 3D printing |
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/auth/me` | Current user profile from token |
+| `POST` | `/auth/sync` | Sync Auth0 user to Supabase |
+| `GET` | `/pets/` | List user's pets |
+| `POST` | `/pets/` | Create a pet |
+| `GET` | `/pets/{id}` | Get pet details |
+| `DELETE` | `/pets/{id}` | Delete a pet |
+| `POST` | `/pets/{id}/generate` | Generate 3D model for a pet |
+| `POST` | `/motion/analyze-video` | Analyze pet video for motion/personality |
+| `POST` | `/motion/analyze-audio` | Classify pet audio (vocal type + emotion) |
+| `GET` | `/motion/personality/{pet_id}` | Get personality profile |
+| `POST` | `/export/{pet_id}/unity` | Download Unity bundle (.zip) |
 
 ---
 
-## Inference Pipeline
+## Modules
 
-### 1. Pet Detection (YOLOv8)
+### Appearance (v1.0)
+Photo → 3D model pipeline using YOLOv8 detection, CLIP attribute extraction, and Meshy.ai cloud generation. Outputs textured GLB files (15k–30k polygons).
 
-```python
-image = load_image(path)
-bbox = yolo.detect(image)
-pet_crop = crop(image, bbox)
-```
+### Motion (v2.1)
+Video analysis using MediaPipe pose extraction, MLP-based 2D→3D lifting, LSTM VAE for motion encoding, and handcrafted feature extraction (speed, entropy, tail wag frequency, gait regularity).
 
-### 2. Attribute Extraction (CLIP)
+### Behavior (v2.2)
+Probabilistic finite state machine (Idle/Curious/Playful/Alert/Resting) with weighted transitions driven by sensory input. PersonalityProfile derived from motion + audio analysis.
 
-```python
-# Breed
-scores = clip.rank(pet_crop, breed_prompts)
-breed = max(scores)
+### Audio (v2.2)
+MFCC feature extraction + 1D CNN classifier. Detects vocal type (bark, meow, whine, growl, purr, silence) and emotion (calm, excited, anxious, playful).
 
-# Coat color & markings
-colors = clip.multi_label(pet_crop, color_prompts)
-markings = clip.multi_label(pet_crop, marking_prompts)
-```
+### World Model (v3.0)
+Latent dynamics model predicting future states. Policy network selects actions via imagination rollouts scored by a reward predictor. Actions: stay, approach, retreat, play, rest.
 
-### 3. 3D Model Generation (TripoSR)
+### Runtime Export
+Packages 3D model + personality + motion + animation curves into a Unity-ready ZIP bundle.
 
-```python
-model = triposr.generate(pet_crop)
-mesh = model.export(format="glb", resolution=256)
-```
+---
+
+## Configuration
+
+All settings are in `pet_soul/config/settings.py` as a frozen dataclass. Key values:
+
+| Setting | Default | Description |
+|---|---|---|
+| `yolo_conf_threshold` | 0.25 | Detection confidence |
+| `clip_model_name` | `openai/clip-vit-base-patch32` | CLIP model |
+| `meshy_ai_model` | `meshy-6` | Meshy.ai model version |
+| `meshy_timeout` | 600s | Max wait for 3D generation |
+| `default_output_format` | `glb` | 3D output format |
+| `host` / `port` | `0.0.0.0` / `8000` | Server binding |
+
+Environment variables (set in `.env`):
+- `MESHY_API_KEY` — Meshy.ai API key
+- `AUTH0_DOMAIN` — Auth0 tenant domain
+- `AUTH0_AUDIENCE` — Auth0 API audience
+- `AUTH0_CLIENT_ID` — Auth0 application client ID
+- `SUPABASE_URL` — Supabase project URL
+- `SUPABASE_KEY` — Supabase API key
 
 ---
 
 ## Testing
 
-### Backend Health Check
+### Health Check
 
 ```bash
 curl http://localhost:8000/health
@@ -253,126 +361,79 @@ Expected:
   "status": "healthy",
   "pipeline_ready": true,
   "detector_ready": true,
-  "generator_ready": true
+  "generator_ready": true,
+  "supabase_ready": true
 }
-```
-
-### Test All Formats
-
-```bash
-curl -X POST "http://localhost:8000/generate-3d-model?format=glb&resolution=128" -F "file=@pet.jpg" -o pet.glb
-curl -X POST "http://localhost:8000/generate-3d-model?format=obj&resolution=128" -F "file=@pet.jpg" -o pet.obj
-curl -X POST "http://localhost:8000/generate-3d-model?format=ply&resolution=128" -F "file=@pet.jpg" -o pet.ply
-curl -X POST "http://localhost:8000/generate-3d-model?format=stl&resolution=128" -F "file=@pet.jpg" -o pet.stl
 ```
 
 ### Viewing 3D Models
 
-- **Windows 3D Viewer** — Right-click `.glb` → Open with → 3D Viewer
 - **Online** — Drag `.glb` to https://gltf-viewer.donmccurdy.com/
-- **Blender** — File → Import → glTF 2.0
-- **MeshLab** — Supports all formats
-
-### Performance Benchmarks
-
-| Hardware | Res 128 | Res 256 | Res 512 |
-|----------|---------|---------|---------|
-| RTX 3080 | ~20s | ~45s | ~90s |
-| RTX 2060 | ~30s | ~60s | ~120s |
-| CPU (8-core) | ~120s | ~240s | ~480s |
+- **Blender** — File > Import > glTF 2.0
+- **Windows 3D Viewer** — Right-click `.glb` > Open with > 3D Viewer
 
 ---
 
-## Dependency Troubleshooting
-
-### huggingface_hub Version Conflict
-
-If you see conflicting dependency errors between `transformers` and `huggingface_hub`:
-
-The `requirements.txt` omits an explicit `huggingface_hub` version so pip can auto-resolve. If issues persist, install in order:
-
-```bash
-pip install numpy scipy pillow opencv-python
-pip install torch==2.1.0 torchvision==0.16.0
-pip install transformers==4.35.0 accelerate==0.24.1
-pip install fastapi uvicorn[standard] ultralytics trimesh pygltflib networkx aiofiles python-dotenv safetensors python-multipart
-pip install git+https://github.com/VAST-AI-Research/TripoSR.git
-```
-
-### "No module named 'tsr'"
-
-```bash
-pip install git+https://github.com/VAST-AI-Research/TripoSR.git
-```
-
-### "Failed building wheel"
-
-Install Visual C++ Build Tools, or use conda:
-
-```bash
-conda create -n pet3d python=3.10
-conda activate pet3d
-conda install pytorch torchvision -c pytorch
-pip install -r requirements.txt
-pip install git+https://github.com/VAST-AI-Research/TripoSR.git
-```
-
-### CUDA Out of Memory
-
-- Lower resolution to 128
-- Force CPU: edit `model3d_generator.py` → `self.device = "cpu"`
-- Close other GPU-consuming applications
+## Troubleshooting
 
 ### "No pet detected"
-
 - Use a clear photo with good lighting
 - Ensure the pet is the main subject
 - Avoid cluttered backgrounds
 
-### Version Compatibility
+### Meshy.ai timeout
+- 3D generation takes 1–3 minutes per model
+- Timeout is set to 600s — increase `meshy_timeout` in config if needed
+- Check your Meshy.ai account quota
 
-| Package | Tested Version | Minimum |
-|---------|---------------|---------|
-| Python | 3.10 | 3.9 |
-| PyTorch | 2.1.0 | 2.0.0 |
-| Transformers | 4.35.0 | 4.30.0 |
-| FastAPI | 0.104.1 | 0.100.0 |
-| Trimesh | 3.23.0+ | 3.20.0 |
+### CLIP model download fails
+- CLIP auto-downloads ~300 MB on first run
+- Ensure internet access and sufficient disk space
+- Model caches to HuggingFace cache directory
+
+### Import errors
+- Ensure you're using the project venv: `source .venv/bin/activate`
+- Run `pip install -r requirements.txt` to install all dependencies
 
 ---
 
 ## Roadmap
 
-### Phase 1 — MVP (Current)
-- Dog support with YOLO + CLIP
-- TripoSR 3D model generation
-- Multi-format export (GLB, OBJ, PLY, STL)
+### Completed
+- **v1.0** — Photo → 3D model pipeline (YOLOv8 + CLIP + Meshy.ai)
+- **v2.0** — Codebase modularization into `pet_soul/` package
+- **v2.1** — Motion analysis (MediaPipe + 3D lifting + LSTM VAE)
+- **v2.2** — Behavior engine (FSM + personality) and audio classification
+- **v3.0** — World model (latent dynamics + policy network) and Unity export
 
-### Phase 2 — Quality
-- Cat & mixed-breed support
-- Marking heuristics
-- Texture improvements
+### Next
+- Train motion VAE and audio CNN on real pet datasets
+- Unity iOS app integration
+- Cat breed classification
+- Real-time webcam motion capture
+- Multi-pet support
 
-### Phase 3 — Production
-- Feedback-based retraining
-- Batch processing
-- Mobile app integration
+---
 
-### Future Ideas
-- Animated models
-- AR filters
-- Merchandise integration
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Backend | FastAPI + Uvicorn |
+| Frontend | React 19 + TypeScript + Vite |
+| 3D Viewer | React Three Fiber + Three.js |
+| Dev Dashboard | Dash + Plotly |
+| Detection | YOLOv8 Nano |
+| Classification | CLIP ViT-base-32 |
+| 3D Generation | Meshy.ai cloud API |
+| Motion | MediaPipe + PyTorch (MLP, LSTM VAE) |
+| Audio | librosa + PyTorch (1D CNN) |
+| Auth | Auth0 (RS256 JWT) |
+| Database | Supabase (PostgreSQL) |
+| Deep Learning | PyTorch 2.1+, Transformers 4.35+ |
 
 ---
 
 ## License
 
 MIT (model licenses may vary)
-
-All systems go. pipeline_ready: true — all three models (YOLO, CLIP, TripoSR) loaded successfully.
-
-  The server is running at http://localhost:8000. You can now:                                                                            - Browse http://localhost:8000/test for the test page
-  - Upload a pet photo to /analyze-pet or /generate-3d-model                                                                            
-  To start the server in the future, use the pyenv venv:
-  source .venv/bin/activate
-  python app.py

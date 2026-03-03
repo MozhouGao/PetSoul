@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Environment, Center } from '@react-three/drei'
+import { useAuth0 } from '@auth0/auth0-react'
 import * as THREE from 'three'
+import {
+  setTokenGetter, syncUser, listPets, createPet, deletePet,
+  analyzeVideo, analyzeAudio, exportUnity, PetResponse,
+} from './api'
 import './App.css'
 
 // ─── GLB Model Component (used inside Canvas) ────────────────────
@@ -226,11 +231,8 @@ function BottomBar({ active, onTab }: { active: string; onTab: (t: string) => vo
 }
 
 // ─── Auth Screen ──────────────────────────────────────────────────
-function AuthScreen({ onAuth }: { onAuth: () => void }) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-  const [email, setEmail] = useState('')
-  const [pass, setPass] = useState('')
-  const [name, setName] = useState('')
+function AuthScreen() {
+  const { loginWithRedirect } = useAuth0()
 
   return (
     <div className="auth-screen">
@@ -246,62 +248,62 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
       <p className="auth-subtitle">Your pets, digitally alive</p>
 
       <div className="auth-card mc-panel">
-        <div className="auth-tabs">
-          <button
-            className={`auth-tab ${mode === 'signin' ? 'active' : ''}`}
-            onClick={() => setMode('signin')}
-          >Sign In</button>
-          <button
-            className={`auth-tab ${mode === 'signup' ? 'active' : ''}`}
-            onClick={() => setMode('signup')}
-          >Sign Up</button>
-        </div>
-
-        <div className="auth-form">
-          {mode === 'signup' && (
-            <input className="mc-input" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} />
-          )}
-          <input className="mc-input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-          <input className="mc-input" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} />
-          {mode === 'signin' && <button className="auth-forgot">Forgot password?</button>}
-        </div>
-
-        <button className="mc-btn mc-btn-primary" style={{ width: '100%', marginBottom: 12 }} onClick={onAuth}>
-          {mode === 'signin' ? 'SIGN IN' : 'CREATE ACCOUNT'}
+        <button
+          className="mc-btn mc-btn-primary"
+          style={{ width: '100%', marginBottom: 12 }}
+          onClick={() => loginWithRedirect()}
+        >
+          SIGN IN / SIGN UP
         </button>
-
-        <div className="auth-divider">
-          <div className="auth-divider-line" />
-          <span className="auth-divider-text">OR</span>
-          <div className="auth-divider-line" />
-        </div>
-
-        <div className="social-btns">
-          <button className="mc-btn social-btn" onClick={onAuth}>Apple</button>
-          <button className="mc-btn social-btn" onClick={onAuth}>Google</button>
-        </div>
+        <p className="auth-subtitle" style={{ fontSize: 10, marginTop: 8 }}>
+          Powered by Auth0
+        </p>
       </div>
     </div>
   )
 }
 
-// ─── Catalog Screen ───────────────────────────────────────────────
+// ─── Pet type helper ─────────────────────────────────────────────
 interface Pet {
   id: number
   name: string
   type: string
+  species?: string
+  breed?: string
   mood: string
   level: number
   modelUrl?: string
+  createdAt?: string
 }
 
-function CatalogScreen({ pets, onViewPet, onTab }: { pets: Pet[]; onViewPet: (p: Pet) => void; onTab: (t: string) => void }) {
+function apiPetToLocal(p: PetResponse): Pet {
+  return {
+    id: p.id,
+    name: p.name,
+    type: p.species || 'dog',
+    species: p.species,
+    breed: p.breed,
+    mood: 'Happy',
+    level: 1,
+    modelUrl: p.model_url || undefined,
+    createdAt: p.created_at,
+  }
+}
+
+// ─── Catalog Screen ───────────────────────────────────────────────
+function CatalogScreen({ pets, userName, onViewPet, onTab, onDeletePet }: {
+  pets: Pet[];
+  userName: string;
+  onViewPet: (p: Pet) => void;
+  onTab: (t: string) => void;
+  onDeletePet: (id: number) => void;
+}) {
   const moodEmoji: Record<string, string> = { Happy: ':)', Playful: ';)', Sleepy: '-_-', Excited: ':D' }
 
   return (
     <div className="catalog-screen">
       <div className="catalog-header">
-        <p className="catalog-greeting">&gt; Hello, Player_1</p>
+        <p className="catalog-greeting">&gt; Hello, {userName}</p>
         <h1 className="catalog-title">YOUR PETS</h1>
 
         <div className="stats-row">
@@ -325,8 +327,16 @@ function CatalogScreen({ pets, onViewPet, onTab }: { pets: Pet[]; onViewPet: (p:
             key={pet.id}
             className="pet-card mc-panel"
             onClick={() => onViewPet(pet)}
-            style={{ animation: `mc-slideUp 0.3s ease ${i * 0.06}s both` }}
+            style={{ animation: `mc-slideUp 0.3s ease ${i * 0.06}s both`, position: 'relative' }}
           >
+            <button
+              className="mc-btn"
+              style={{
+                fontSize: 8, padding: '2px 6px', position: 'absolute', top: 4, right: 4, zIndex: 2,
+                minWidth: 'auto', lineHeight: 1,
+              }}
+              onClick={(e) => { e.stopPropagation(); onDeletePet(pet.id) }}
+            >X</button>
             <PetModelViewer modelUrl={pet.modelUrl} type={pet.type} size={120} autoSpin />
             <div className="pet-name">{pet.name}</div>
             <div className="pet-badges">
@@ -344,6 +354,12 @@ function CatalogScreen({ pets, onViewPet, onTab }: { pets: Pet[]; onViewPet: (p:
 
 // ─── Pet Detail Modal ─────────────────────────────────────────────
 function PetDetailModal({ pet, onClose }: { pet: Pet | null; onClose: () => void }) {
+  const [videoStatus, setVideoStatus] = useState<string | null>(null)
+  const [audioStatus, setAudioStatus] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const videoRef = useRef<HTMLInputElement>(null)
+  const audioRef = useRef<HTMLInputElement>(null)
+
   if (!pet) return null
 
   const stats = [
@@ -352,6 +368,46 @@ function PetDetailModal({ pet, onClose }: { pet: Pet | null; onClose: () => void
     { label: 'Hunger', val: 45, color: 'var(--mc-danger)' },
     { label: 'Social', val: 90, color: 'var(--mc-purple)' },
   ]
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setVideoStatus('Analyzing...')
+    try {
+      const result = await analyzeVideo(f, pet.id)
+      setVideoStatus(`Done! ${result.frames_analyzed} frames analyzed`)
+    } catch {
+      setVideoStatus('Error analyzing video')
+    }
+  }
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setAudioStatus('Classifying...')
+    try {
+      const result = await analyzeAudio(f, pet.id)
+      setAudioStatus(`${result.classification.vocal_type} (${result.classification.emotion})`)
+    } catch {
+      setAudioStatus('Error analyzing audio')
+    }
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const blob = await exportUnity(pet.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pet_${pet.id}_unity.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // silently fail
+    }
+    setExporting(false)
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -364,7 +420,7 @@ function PetDetailModal({ pet, onClose }: { pet: Pet | null; onClose: () => void
 
         <div className="detail-name">{pet.name}</div>
         <div className="detail-type">
-          {pet.type.charAt(0).toUpperCase() + pet.type.slice(1)} // Level {pet.level}
+          {pet.breed || pet.type.charAt(0).toUpperCase() + pet.type.slice(1)} // Level {pet.level}
         </div>
 
         <div className="stats-grid">
@@ -393,6 +449,31 @@ function PetDetailModal({ pet, onClose }: { pet: Pet | null; onClose: () => void
             </button>
           ))}
         </div>
+
+        <div className="action-buttons" style={{ marginTop: 8 }}>
+          <button className="mc-btn action-btn" onClick={() => videoRef.current?.click()}>
+            Video
+          </button>
+          <button className="mc-btn action-btn" onClick={() => audioRef.current?.click()}>
+            Audio
+          </button>
+          <button className="mc-btn action-btn" onClick={handleExport} disabled={exporting}>
+            {exporting ? '...' : 'Export'}
+          </button>
+        </div>
+        <input ref={videoRef} type="file" accept="video/*" onChange={handleVideoUpload} style={{ display: 'none' }} />
+        <input ref={audioRef} type="file" accept="audio/*" onChange={handleAudioUpload} style={{ display: 'none' }} />
+
+        {videoStatus && (
+          <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--mc-text-soft)', marginTop: 6 }}>
+            Video: {videoStatus}
+          </div>
+        )}
+        {audioStatus && (
+          <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--mc-text-soft)', marginTop: 4 }}>
+            Audio: {audioStatus}
+          </div>
+        )}
 
         <div className="drag-hint">&gt; Drag to rotate / scroll to zoom _</div>
       </div>
@@ -439,49 +520,26 @@ function AddPetScreen({ onTab, onPetCreated }: { onTab: (t: string) => void; onP
       return
     }
 
-    // Real API call to generate-3d-model
-    const formData = new FormData()
-    formData.append('file', file)
-
     // Simulate progress while waiting for the API
     let p = 0
     const progressId = setInterval(() => {
       p += Math.random() * 3 + 1
-      if (p > 90) p = 90 // Cap at 90% until API responds
+      if (p > 90) p = 90
       setProgress(Math.min(p, 90))
     }, 500)
 
     try {
-      const response = await fetch('/generate-3d-model', {
-        method: 'POST',
-        body: formData,
-      })
-
+      const pet = await createPet(file, petName)
       clearInterval(progressId)
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.model_url) {
-          setGeneratedModelUrl(data.model_url)
-          onPetCreated({
-            id: Date.now(),
-            name: petName,
-            type: data.profile?.species || 'dog',
-            mood: 'Happy',
-            level: 1,
-            modelUrl: data.model_url,
-          })
-        }
-        setProgress(100)
-        setTimeout(() => setDone(true), 400)
-      } else {
-        // Handle error - still show done but without model
-        setProgress(100)
-        setTimeout(() => setDone(true), 400)
+      if (pet.model_url) {
+        setGeneratedModelUrl(pet.model_url)
       }
+      onPetCreated(apiPetToLocal(pet))
+      setProgress(100)
+      setTimeout(() => setDone(true), 400)
     } catch {
       clearInterval(progressId)
-      // Fallback: complete without model
       setProgress(100)
       setTimeout(() => setDone(true), 400)
     }
@@ -635,31 +693,84 @@ function AddPetScreen({ onTab, onPetCreated }: { onTab: (t: string) => void; onP
 
 // ─── Main App ─────────────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState<'auth' | 'catalog' | 'add'>('auth')
+  const { isAuthenticated, isLoading, getAccessTokenSilently, user, logout } = useAuth0()
+  const [screen, setScreen] = useState<'catalog' | 'add'>('catalog')
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null)
-  const [pets, setPets] = useState<Pet[]>([
-    { id: 1, name: 'Tiger', type: 'cat', mood: 'Happy', level: 5, modelUrl: '/models/pet_0e1d1521_1771566605.glb' },
-    { id: 2, name: 'Buddy', type: 'dog', mood: 'Playful', level: 1, modelUrl: '/models/pet_019ca772_meshy.glb' },
-  ])
+  const [pets, setPets] = useState<Pet[]>([])
+  const [synced, setSynced] = useState(false)
+
+  // Wire token getter when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      setTokenGetter(getAccessTokenSilently)
+    }
+  }, [isAuthenticated, getAccessTokenSilently])
+
+  // Sync user to Supabase + load pets after authentication
+  useEffect(() => {
+    if (!isAuthenticated || synced) return
+    ;(async () => {
+      try {
+        await syncUser()
+        const apiPets = await listPets()
+        setPets(apiPets.map(apiPetToLocal))
+        setSynced(true)
+      } catch (err) {
+        console.error('Sync/load failed:', err)
+        setSynced(true) // prevent retry loop
+      }
+    })()
+  }, [isAuthenticated, synced])
 
   const handleTab = (tab: string) => {
     setSelectedPet(null)
     if (tab === 'add') setScreen('add')
-    else if (tab === 'catalog' || tab === 'home') setScreen('catalog')
-    else if (tab === 'profile') setScreen('auth')
+    else if (tab === 'profile') logout({ logoutParams: { returnTo: window.location.origin } })
     else setScreen('catalog')
   }
 
   const handlePetCreated = (pet: Pet) => {
-    setPets(prev => [...prev, pet])
+    setPets(prev => [pet, ...prev])
+  }
+
+  const handleDeletePet = async (id: number) => {
+    try {
+      await deletePet(id)
+      setPets(prev => prev.filter(p => p.id !== id))
+    } catch (err) {
+      console.error('Delete failed:', err)
+    }
+  }
+
+  const userName = user?.name || user?.email?.split('@')[0] || 'Player_1'
+
+  if (isLoading) {
+    return (
+      <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <LoadingBlock />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="app-container">
+        <AuthScreen />
+      </div>
+    )
   }
 
   return (
     <div className="app-container">
-      {screen === 'auth' && <AuthScreen onAuth={() => setScreen('catalog')} />}
       {screen === 'catalog' && (
         <>
-          <CatalogScreen pets={pets} onViewPet={setSelectedPet} onTab={handleTab} />
+          <CatalogScreen
+            pets={pets}
+            userName={userName}
+            onViewPet={setSelectedPet}
+            onTab={handleTab}
+            onDeletePet={handleDeletePet}
+          />
           <PetDetailModal pet={selectedPet} onClose={() => setSelectedPet(null)} />
         </>
       )}

@@ -6,13 +6,13 @@ Orchestrates the complete pet 3D model generation workflow
 import logging
 import numpy as np
 from typing import Dict, Optional
-from pet_detector import PetDetector
-from attribute_extractor import AttributeExtractor
-from prompt_builder import PromptBuilder
-from meshy_generator import MeshyGenerator
-from pet_profile import PetProfile
+from pet_soul.appearance.pet_detector import PetDetector
+from pet_soul.appearance.attribute_extractor import AttributeExtractor
+from pet_soul.appearance.prompt_builder import PromptBuilder
+from pet_soul.appearance.meshy_generator import MeshyGenerator
+from pet_soul.appearance.pet_profile import PetProfile
 
-from config import CONFIG
+from pet_soul.config import CONFIG
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ Constructs prompts for SDXL avatar generation from pet attributes
 
 import logging
 from typing import List
-from pet_profile import PetProfile
+from pet_soul.appearance.pet_profile import PetProfile
 
 logger = logging.getLogger(__name__)
 

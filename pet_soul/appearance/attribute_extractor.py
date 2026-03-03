@@ -9,7 +9,7 @@ from typing import List, Dict, Tuple, Optional
 from PIL import Image
 import torch
 
-from config import CONFIG
+from pet_soul.config import CONFIG
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from typing import Optional, Tuple
 from ultralytics import YOLO
 from pathlib import Path
 
-from config import CONFIG
+from pet_soul.config import CONFIG, PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,8 @@ class PetDetector:
         self.model_ready = False
 
         if model_path is None:
-            # Look for yolov8n.pt in current directory
-            default_path = Path(__file__).parent / CONFIG.yolo_model
+            # Look for yolov8n.pt at the project root
+            default_path = PROJECT_ROOT / CONFIG.yolo_model
             if default_path.exists():
                 model_path = str(default_path)
             else:

@@ -1,6 +1,6 @@
 # ============================================
-# Pet 3D Model Generator - Dependencies
-# Python 3.9–3.13 compatible
+# Pet Digital Twin Platform - Dependencies
+# Python 3.10+ compatible
 # ============================================
 
 # Core Web Framework
@@ -31,21 +31,30 @@ safetensors>=0.4.0
 # ============================================
 # 3D Model Generation (Meshy.ai API)
 # ============================================
-requests>=2.31.0  # HTTP client for Meshy API
+requests>=2.31.0
 
 # ============================================
-# Optional Enhancements (Recommended)
+# Auth (Auth0 JWT verification)
 # ============================================
-# pymeshlab  # Advanced mesh processing (uncomment if needed)
-# rembg  # Background removal for better 3D quality (uncomment if needed)
+PyJWT[crypto]>=2.8.0
+cryptography>=41.0.0
+pydantic[email]>=2.0.0
+
+# ============================================
+# Database (Supabase)
+# ============================================
+supabase>=2.0.0
+
+# ============================================
+# Motion Module (v2.1)
+# ============================================
+mediapipe>=0.10.0
+
+# ============================================
+# Audio Module (v2.2)
+# ============================================
+librosa>=0.10.0       # MFCC extraction (optional: scipy fallback exists)
 
 # Utilities
 aiofiles>=23.2.1
 python-dotenv>=1.0.0
-
-# Database + Auth
-SQLAlchemy>=2.0.0
-PyJWT>=2.8.0
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.0
-pydantic[email]>=2.0.0

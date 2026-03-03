@@ -9,6 +9,25 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
+      '/auth': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/pets': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        timeout: 600000,
+      },
+      '/motion': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        timeout: 600000,
+      },
+      '/export': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        timeout: 600000,
+      },
       '/analyze-pet': {
         target: 'http://localhost:8000',
         changeOrigin: true,
@@ -19,6 +38,10 @@ export default defineConfig({
         timeout: 600000,
       },
       '/models': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/health': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
