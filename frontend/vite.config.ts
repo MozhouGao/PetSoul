@@ -1,22 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
+const api = {
+  target: 'http://127.0.0.1:8000',
+  changeOrigin: true,
+  timeout: 0,
+  proxyTimeout: 0,
+}
+
 export default defineConfig({
   plugins: [react()],
   server: {
-    fs: {
-      allow: ['..'],
-    },
     proxy: {
-      '/analyze-pet': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/generate-3d-model': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
+      '/generate-3d-model': api,
+      '/models': api,
+      '/pet-assets': api,
+      '/sounds': api,
+      '/health': api,
     },
   },
 })

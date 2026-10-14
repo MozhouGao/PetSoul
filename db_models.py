@@ -35,3 +35,15 @@ class Pet(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     owner = relationship("User", back_populates="pets")
+
+
+class SoundClip(Base):
+    __tablename__ = "sound_clips"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_id = Column(String, nullable=False, index=True)
+    pet_id = Column(Integer, ForeignKey("pets.id"), nullable=True)
+    label = Column(String, nullable=False, default="other")
+    filename = Column(String, nullable=False)
+    duration = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

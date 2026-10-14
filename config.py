@@ -12,6 +12,8 @@ class Config:
     # Paths
     static_dir: Path = Path(__file__).parent / "static"
     models_dir: Path = Path(__file__).parent / "models"
+    sounds_dir: Path = Path(__file__).parent / "sounds"
+    videos_dir: Path = Path(__file__).parent / "videos"
     frontend_dist: Path = Path(__file__).parent / "frontend" / "dist"
     db_path: Path = Path(__file__).parent / "pet_soul.db"
     yolo_model: str = "yolov8n.pt"

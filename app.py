@@ -22,6 +22,8 @@ from pipeline import Pet3DModelPipeline
 from database import init_db
 from routes_auth import router as auth_router
 from routes_pets import router as pets_router, set_pipeline
+from routes_assets import router as assets_router
+from rigging_service import rig_static_model
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,7 @@ set_pipeline(pipeline)
 # Include routers
 app.include_router(auth_router)
 app.include_router(pets_router)
+app.include_router(assets_router)
 
 # Web test page
 if CONFIG.static_dir.exists():
@@ -55,8 +58,10 @@ if CONFIG.static_dir.exists():
 
 # Output directory for 3D models
 CONFIG.models_dir.mkdir(exist_ok=True)
+CONFIG.sounds_dir.mkdir(exist_ok=True)
 if CONFIG.models_dir.exists():
     app.mount("/models", StaticFiles(directory=str(CONFIG.models_dir)), name="models")
+app.mount("/sounds", StaticFiles(directory=str(CONFIG.sounds_dir)), name="sounds")
 
 # Serve React production build if it exists
 if CONFIG.frontend_dist.exists():
@@ -148,12 +153,17 @@ async def generate_3d_model(
         if not model_path or not Path(model_path).exists():
             api_error(500, "Failed to generate 3D model")
 
+        rigged = rig_static_model(output_path)
+        model_id = Path(output_filename).stem
         return {
             "success": True,
             "profile": result.get("profile", {}),
             "texture_prompt": result.get("prompt", ""),
             "model_url": f"/models/{output_filename}",
             "filename": output_filename,
+            "model_id": model_id,
+            "rigged_model_url": f"/models/{rigged.name}" if rigged else None,
+            "animation_clips": ["idle", "walk", "run", "sit", "stand", "stretch"] if rigged else [],
         }
 
     except HTTPException:

@@ -26,6 +26,11 @@ class PromptBuilder:
         """
         parts = []
 
+        # Standing bind pose so the mesh can be skinned onto the dog skeleton.
+        parts.append(
+            "standing on all four legs, feet on the ground, legs separated, tail extended"
+        )
+
         # Breed
         breed = profile.breed.lower() if profile.breed else profile.species
         parts.append(f"a {breed}")

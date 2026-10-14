@@ -19,6 +19,7 @@ from database import get_db
 from db_models import Pet, User
 from auth import get_current_user
 from pipeline import Pet3DModelPipeline
+from rigging_service import rig_static_model, rigged_path_for
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ async def create_pet(
     output_path = CONFIG.models_dir / output_filename
 
     result = pipeline.process(image_rgb, output_path=str(output_path))
+    rig_static_model(output_path)
 
     if "error" in result and "profile" not in result:
         raise HTTPException(status_code=500, detail=result["error"])
@@ -107,6 +109,39 @@ async def create_pet(
     return _pet_to_dict(pet)
 
 
+@router.post("/{pet_id}/sounds")
+async def upload_pet_sound(
+    pet_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Store a recording on a saved pet. Clips start unlabeled (`other`) until a person labels them."""
+    from pathlib import Path
+    import shutil
+    from routes_assets import store_sound_takes
+    from sound_bank import decode_upload, split_on_energy
+
+    pet = db.query(Pet).filter(Pet.id == pet_id, Pet.user_id == user.id).first()
+    if not pet or not pet.model_filename:
+        raise HTTPException(status_code=404, detail="Pet not found")
+    model_id = Path(pet.model_filename).stem
+    raw = await file.read()
+    suffix = Path(file.filename or "clip.wav").suffix or ".wav"
+    work = CONFIG.sounds_dir / model_id / "_incoming"
+    try:
+        samples, rate = decode_upload(raw, suffix, work)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        if work.exists():
+            shutil.rmtree(work, ignore_errors=True)
+    takes = split_on_energy(samples, rate)
+    if not takes:
+        raise HTTPException(status_code=400, detail="no sound above the silence threshold")
+    return store_sound_takes(db, model_id, takes, rate, pet_id=pet.id)
+
+
 @router.delete("/{pet_id}")
 def delete_pet(pet_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     pet = db.query(Pet).filter(Pet.id == pet_id, Pet.user_id == user.id).first()
@@ -127,5 +162,15 @@ def _pet_to_dict(pet: Pet) -> dict:
         "profile": json.loads(pet.profile_json) if pet.profile_json else {},
         "texture_prompt": pet.texture_prompt,
         "model_url": f"/models/{pet.model_filename}" if pet.model_filename else None,
+        "rigged_model_url": _rigged_url(pet.model_filename),
         "created_at": pet.created_at.isoformat() if pet.created_at else None,
     }
+
+
+def _rigged_url(model_filename: str):
+    if not model_filename:
+        return None
+    rigged = rigged_path_for(CONFIG.models_dir / model_filename)
+    if not rigged.exists():
+        return None
+    return f"/models/{rigged.name}"

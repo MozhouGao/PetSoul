@@ -16,6 +16,16 @@ models/*.stl
 models/*.obj
 avatars/*.png
 avatars/*.jpg
+sounds/
+videos/
+
+# Unity
+PetSoulApp/Library/
+PetSoulApp/Temp/
+PetSoulApp/Logs/
+PetSoulApp/obj/
+PetSoulApp/UserSettings/
+PetSoulApp/Builds/
 
 # IDE
 .vscode/
